@@ -4,11 +4,10 @@ import numpy.random as random
 from scipy.interpolate import interp1d
 from scipy.optimize import brentq
 from ..relations import Relation
+from .. import DISDIR
 
 import colossus
 cosmo = colossus.cosmology.cosmology.setCosmology('planck18')
-
-DISDIR = '/home/stacykim/research/projects/vfxn/orig/disPy'
 
 
 

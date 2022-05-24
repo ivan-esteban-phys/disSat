@@ -1,8 +1,7 @@
 import numpy as np
 import numpy.random as random
 from ..relations import Relation
-
-DISDIR = '/home/stacykim/research/projects/vfxn/orig/disPy'
+from .. import DISDIR
 
 
 
