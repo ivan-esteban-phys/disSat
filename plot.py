@@ -4,10 +4,10 @@ mpl.rcParams.update({'font.size': 17})
 mpl.rcParams.update({'font.family': 'serif'})
 mpl.rcParams.update({'text.usetex': True})
 import matplotlib.pyplot as plt
-from vcorrect import *
+from .observations.vcorrect import *
 
 
-def plot_observed_velocity_function():
+def plot_observed_velocity_function(label=False):
 
     profiles = ['nfw','h14e,gk17']
     sigmas, rdist_names,nboot = vcorrect(profiles,bootstrap=True)
@@ -21,9 +21,9 @@ def plot_observed_velocity_function():
     classicals = np.array([ dwarf['sigma'] for dwarf_name,dwarf in dwarfs.items() if dwarf['type']=='classical' ])
     cvfxn = np.array([ sum(classicals>=sigma) for sigma in obssigmas ])
 
+    plt.plot(obssigmas,obsvfxn,color='0.5',label='observed' if label==True else '') # 'k' if plotband else 'C5' # obs
     plt.fill_between(obssigmas,vfxn[:,0],vfxn[:,1],color='k',alpha=0.2) # bounded by median prediction for NFW and GK14 disk stripping distributions
-    plt.fill_between(obssigmas,vfxn10[:,0],vfxn90[:,1],color='k',alpha=0.2) # 2-sigmas
-    plt.plot(obssigmas,obsvfxn,color='0.5') # 'k' if plotband else 'C5' # obs
+    plt.fill_between(obssigmas,vfxn10[:,0],vfxn90[:,1],color='k',alpha=0.2,label='corrected' if label==True else '') # 2-sigmas
 
 
 def plot_theoretical_velocity_fuction(satpops, median_only=False, alpha=1, label='', color='C0', linestyle='-'):
