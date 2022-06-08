@@ -62,16 +62,13 @@ class SatellitePopulation:
     def _sample_subhalo_masses(self):
         m = self.host.subhalo_mass_function(self.min_mass, self.host.mass(),
                                             self.host.number_of_subhalos)
-        if isinstance(self.dark_matter, dark_matter.models.CDM):
-            return m
-        elif isinstance(self.dark_matter, dark_matter.models.WDM):
+        if isinstance(self.dark_matter, dark_matter.models.WDM):
             tf = self.dark_matter.transfer_function(m, self.dark_matter.mWDM)
             mask = np.less_equal(random.random(size=len(m)), tf)
             self.host.number_of_subhalos = sum(mask)
             return m[mask]
         else:
-            raise ValueError('Got unspoorted cosmology!')
-
+            return m
         
     def _sample_concentrations(self):
         c = self.concentration(self.properties['mass'], self.z_infall)
@@ -111,7 +108,8 @@ class SatellitePopulation:
                                  mstar=self.properties['mass_stars'],
                                  Re0=self.properties['rhalf2D'],
                                  c200=self.properties['c200'],
-                                 cNFW_method=c_model_short)
+                                 cNFW_method=c_model_short,
+                                 sigmaSI=self.dark_matter.sigSI if isinstance(self.dark_matter, dark_matter.models.SIDM) else None)
         else:
             sigLOS = np.zeros(self.host.number_of_subhalos)
             icore = np.where(is_galaxy * (self.properties['profile']=='coreNFW'))[0]
@@ -161,7 +159,7 @@ class MilkyWaySatellites(SatellitePopulation):
         self.concentration = dark_matter.concentrations.Diemer19(scatter=True)
         self.smhm = baryons.smhm.Moster13(scatter=True)
         self.occupation_fraction = baryons.occupation_fraction.Dooley17(zreion=9.3)
-        self.rhalf_2D = baryons.galaxy_size.Read17(scatter=True)        
+        self.rhalf_2D = baryons.galaxy_size.Read17(scatter=True)
 
         for name, attribute in cosmology.__dict__.items():
             if isinstance(attribute, Relation):
