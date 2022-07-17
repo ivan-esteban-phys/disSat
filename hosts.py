@@ -7,7 +7,6 @@ class Host:
         self.dark_matter = cosmology
         self.subhalo_mass_function = dark_matter.subhaloMF.Moster13(scatter=True)
         
-        
     @staticmethod
     def mass():
         raise NotImplementedError('This is an abstract class')
@@ -18,11 +17,6 @@ class Host:
 
     
 class MilkyWay(Host):
-
-    def __init__(self, cosmology=dark_matter.models.CDM()):
-
-        self.dark_matter = cosmology
-        self.subhalo_mass_function = dark_matter.subhaloMF.Moster13(scatter=True)        
     
     @staticmethod
     def mass():

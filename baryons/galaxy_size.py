@@ -31,7 +31,7 @@ class GalaxySize(Relation):
 
 class Read17(GalaxySize):
     """
-    Fit to isolated dwarfs from Read+ 2017 and McConnachie+ 2012,
+    Fit to 2D sizes of isolated dwarfs from Read+ 2017 and McConnachie+ 2012,
     taking out repeats from the latter, and no Leo T.
     """
 
@@ -46,3 +46,37 @@ class Read17(GalaxySize):
         return 0.234
 
     
+class Danieli18(GalaxySize):
+    """
+    From Danieli+ 2018, which fit a relation to observed 2D sizes of MW, M31,
+    and LG dwarfs, assuming a V-band mass-to-light ratio = 2.0.
+    """
+
+    name = 'Danieli18'
+
+    @classmethod
+    def central_value(cls, mstar):
+        return 10**(0.23*np.log10(mstar)-1.93)
+
+    @staticmethod
+    def scatter():
+        return 0.29
+
+
+class Jiang19(GalaxySize):
+    """
+    Jiang+ 2018's 3D half-light radius to dark matter virial radius
+    scaling relation, converted into 2D sizes via Wolf+ 2010's 
+    conversion factor.
+    """
+
+    name = 'Jiang19'
+    
+    @classmethod
+    def central_value(cls, rvir, c200):
+        rhalf3D = 0.02 * (c200/10.)**-0.7 * rvir
+        return 0.75*rhalf3D # convert to 2D
+
+    @staticmethod
+    def scatter():
+        return 0.12

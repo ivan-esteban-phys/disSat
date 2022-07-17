@@ -5,6 +5,7 @@ mpl.rcParams.update({'font.family': 'serif'})
 mpl.rcParams.update({'text.usetex': True})
 import matplotlib.pyplot as plt
 from .observations.vcorrect import *
+from .core import SatellitePopulation
 
 
 def plot_observed_velocity_function(label=False, axes=None):
@@ -61,7 +62,7 @@ def plot_corrected_velocity_function(label=False, uncertainty='fiducial', color=
 
 def plot_theoretical_velocity_fuction(satpops, median_only=False, alpha=1, label='', color='C0', linestyle='-', axes=None):
     """
-    Must give an array of SatellitePopulation objects.
+    Must give either an array of SatellitePopulation objects or an array of vfxns.
     """
 
     if axes==None: axes = plt.gca()
@@ -73,13 +74,18 @@ def plot_theoretical_velocity_fuction(satpops, median_only=False, alpha=1, label
     #plt.plot(plotsigs,vfxn)
     
     # for an array of satellite populations
-    vfxns = np.array([ satpop.properties['sigLOS'] for satpop in satpops ],dtype=object)
+    if isinstance(satpops[0], SatellitePopulation):
+        vfxns = np.array([ satpop.properties['sigLOS'] for satpop in satpops ],dtype=object)
+    else:
+        vfxns = satpops[:]
+        
     p2sm = np.array([ np.percentile([sum(sigs>s) for sigs in vfxns], 2.3) for s in plotsigs])
     p1sm = np.array([ np.percentile([sum(sigs>s) for sigs in vfxns],15.9) for s in plotsigs])
     vfxn = np.array([ np.percentile([sum(sigs>s) for sigs in vfxns],50  ) for s in plotsigs])
     p1sp = np.array([ np.percentile([sum(sigs>s) for sigs in vfxns],84.1) for s in plotsigs])
     p2sp = np.array([ np.percentile([sum(sigs>s) for sigs in vfxns],97.7) for s in plotsigs])
 
+    
     if not median_only:
         axes.fill_between(plotsigs,p2sm,p2sp,alpha=0.1,color=color)
         axes.fill_between(plotsigs,p1sm,p1sp,alpha=0.2,color=color)

@@ -1,7 +1,10 @@
+import warnings
 import numpy.random as random
 from ..relations import Relation
 import colossus
-cosmo = colossus.cosmology.cosmology.setCosmology('planck18')
+cosmoWMAP5 = colossus.cosmology.cosmology.setCosmology('WMAP5')
+cosmoP13 = colossus.cosmology.cosmology.setCosmology('planck13')
+cosmoP18 = colossus.cosmology.cosmology.setCosmology('planck18')
 
 
 """
@@ -42,10 +45,46 @@ class Diemer19(MassConcentration):
 
     @classmethod
     def central_value(cls, mass, z):
-        h0 = cosmo.Hz(0)/100.
+        colossus.cosmology.cosmology.setCurrent(cosmoP18)
+        h0 = cosmoP18.Hz(0)/100.
         return colossus.halo.concentration.concentration(mass/h0, '200c', z, model='diemer19')
     
     @staticmethod
     def scatter():
         """Lognormal scatter."""
         return 0.16
+
+
+class Duffy08(MassConcentration):
+
+    name = 'Duffy08'
+
+    @classmethod
+    def central_value(cls, mass, z):
+        colossus.cosmology.cosmology.setCurrent(cosmoWMAP5)
+        h0 = cosmoWMAP5.Hz(0)/100.
+        c = colossus.halo.concentration.concentration(mass/h0, '200c', z, model='duffy08')
+        colossus.cosmology.cosmology.setCurrent(cosmoP18)  # set back to Planck 18
+        return c
+
+    @staticmethod
+    def scatter():
+        return 0.15  # 0.11 for just relaxed halos
+
+
+
+class Dutton14(MassConcentration):
+
+    name = 'Dutton14'
+
+    @classmethod
+    def central_value(cls, mass, z):
+        colossus.cosmology.cosmology.setCurrent(cosmoP13)
+        h0 = cosmoP13.Hz(0)/100.
+        c = colossus.halo.concentration.concentration(mass/h0, '200c', z, model='dutton14')
+        colossus.cosmology.cosmology.setCurrent(cosmoP18)  # set back to Planck 18
+        return c
+
+    @staticmethod
+    def scatter():
+        return 0.11  # for relaxed halos...
