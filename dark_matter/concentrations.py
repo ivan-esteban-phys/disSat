@@ -13,6 +13,8 @@ For now, this only support concentrations in the 200c definition.
 
 
 class MassConcentration(Relation):
+
+    name = 'MassConcentration'
     
     def __init__(self, scatter=True):
         self.parameters = {}

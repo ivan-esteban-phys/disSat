@@ -6,19 +6,18 @@ cosmo = colossus.cosmology.cosmology.setCosmology('planck18')
 
 from ....relations import Relation
 from ... import concentrations, subhaloMF
-from ..skeleton import ModifiedConcentration
+from ..skeleton import ModifiedConcentration, DarkMatterModel
 from .helper import half_mode_mass
 from . import transfer_functions
 
 
-class WDM:
+class WDM(DarkMatterModel):
 
     name = 'WDM'
 
     def __init__(self, mWDM=3.):
         self.mWDM = mWDM
         self.parameters = {'mWDM': self.mWDM}
-        self.concentration = concentrations.Diemer19(scatter=True)
         self.modified_concentration = Schneider12()
         self.transfer_function = transfer_functions.Lovell20()
 

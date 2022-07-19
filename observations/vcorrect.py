@@ -167,7 +167,7 @@ AREA_SKY     = 41253. # total area of the sky (sq. deg)
 # ------------------------------------------------------------------------------
 # radial correction functions
 
-def correct(profiles):
+def correct(profiles, verbose=True):
 
     menc_fxns   = []
     rdist_names = []
@@ -231,7 +231,7 @@ def correct(profiles):
         # read in modification to profile, if provided
         if mod != None:
             datfn = DISDIR+'/data/radial_distributions/'+mod+'-mod.dat'
-            print('reading modification from',datfn)
+            if verbose: print('reading radial distribution modification function from',datfn)
             rr,mm = loadtxt(datfn,unpack=True)
             rr *= 300 if rr[-1]/100 < 1 else 1
             interp_fxns += [ menc_fxns[len(menc_fxns)-1] ]
@@ -240,11 +240,6 @@ def correct(profiles):
             ifxn += 2
 
             rdist_names[-1] += '+'+mod
-
-        # solve for radius that encloses half the satellites
-        result = minimize_scalar(lambda rr: abs(menc_fxns[-1](rr,1)-0.5), bounds=(10,300), method='Bounded')
-        print('for',rdist_names[-1],'r1/2 =',result.x,'kpc')
-
 
 
     # -------------------------------------------------------------------------
@@ -259,21 +254,23 @@ def correct(profiles):
         rc = dmax(dwarf['mv'],MLIMIT_SDSS)
         rc = RVIR if rc > RVIR else rc
 
-        print('{0:<20}  {1:>7} kpc'.format(dwarf_name,round(rc,2)),end=' ')
+        if verbose: print('{0:<20}  {1:>7} kpc'.format(dwarf_name,round(rc,2)),end=' ')
 
         for im,maglim in enumerate(['full', MLIMIT_DES, MLIMIT_LSST1]):
             rout = dmax(dwarf['mv'],maglim)
             rout = RVIR if rout > RVIR else rout
-            print('| {0:>7} kpc '.format(round(rout,2)),end='')
+            if verbose: print('| {0:>7} kpc '.format(round(rout,2)),end='')
             crs_tot[im] += [ [ menc(rout,dwarf['type'])/menc(rc,dwarf['type']) for menc in menc_fxns ] ]
             #crs_tot[im] += [ [ crfxn(rc,dwarf['type'])/crfxn(rout,dwarf['type']) for crfxn in crfxns ] ]
-            print(' '.join(['{0:<7}'.format(round(cr,3)) for cr in crs_tot[im][-1]]),end=' ')
-        print()
+            if verbose: print(' '.join(['{0:<7}'.format(round(cr,3)) for cr in crs_tot[im][-1]]),end=' ')
+        if verbose: print()
 
 
     # and print the results
     for iml,maglim in enumerate(['full','DES', 'LSST']):
 
+        if not verbose: break
+        
         print()
         print('MAGLIM',maglim,end=' ')
 
@@ -292,7 +289,7 @@ def correct(profiles):
 # -----------------------------------------------------------------------------
 # velocity function, completeness corrected, for full sky
 
-def vcorrect(profiles,bootstrap=True,nboot=1000,obs_uncertainty=None):
+def vcorrect(profiles,bootstrap=True,nboot=1000,obs_uncertainty=None,verbose=True):
     """
     Returns a list of the velocities of a completeness-corrected sample of galaxies.
     obs_uncertainty = None, 'sigdiv2' to divide all uncertainties by a factor of 2, or
@@ -304,7 +301,7 @@ def vcorrect(profiles,bootstrap=True,nboot=1000,obs_uncertainty=None):
     id = -1  # UFD dwarf index
 
     # do radial completeness correction
-    crs_tot, menc_fxns, rdist_names = correct(profiles)
+    crs_tot, menc_fxns, rdist_names = correct(profiles, verbose=verbose)
 
     if bootstrap:
         sigmas = [ [ [] for ib in range(nboot) ] for ird in range(nprofiles) ]
@@ -341,4 +338,4 @@ def vcorrect(profiles,bootstrap=True,nboot=1000,obs_uncertainty=None):
         for ip in range(nprofiles):
             for ib in range(nboot): sigmas[ip][ib] = concatenate(sigmas[ip][ib])
 
-    return array(sigmas), rdist_names, nboot
+    return array(sigmas, dtype=object), rdist_names, nboot

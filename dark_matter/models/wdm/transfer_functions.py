@@ -6,6 +6,8 @@ from ....relations import Relation
 
 class TransferFunction(Relation):
 
+    name = 'TransferFunction'
+
     def __init__(self):
         self.parameters = {'mu': self.mu(),
                            'beta': self.beta(),

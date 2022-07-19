@@ -1,4 +1,6 @@
-class SIDM:
+from .skeleton import DarkMatterModel
+
+class SIDM(DarkMatterModel):
     
     name = 'SIDM'
 

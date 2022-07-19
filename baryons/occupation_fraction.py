@@ -6,7 +6,9 @@ from .. import DISDIR
 
 
 class OccupationFraction(Relation):
-        
+
+    name = 'OccupationFraction'
+    
     @classmethod
     def central_value(self, mass):
         raise NotImplementedError('This is an abstract class.')
@@ -34,21 +36,21 @@ class Dooley17(OccupationFraction):
     minfall,flum_dat = None,None
 
     
-    def __init__(self, zreion=9.3):
+    def __init__(self, reionization_redshift=9.3):
 
-        self.parameters = {'reionization_redshift': zreion}
+        self.parameters = {'reionization_redshift': reionization_redshift}
 
-        if zreion == 9.3:
+        if reionization_redshift == 9.3:
             self.__class__.minfall  = self.__class__.minfall93
             self.__class__.flum_dat = self.__class__.flum_dat93
-        elif zreion == 11.3:
+        elif reionization_redshift == 11.3:
             self.__class__.minfall  = self.__class__.minfall113
             self.__class__.flum_dat = self.__class__.flum_dat113
-        elif zreion == 14.4:
+        elif reionization_redshift == 14.4:
             self.__class__.minfall  = self.__class__.minfall144
             self.__class__.flum_dat = self.__class__.flum_dat144
         else:
-            raise ValueError('no support for reionization redshift '+str(zreion)+'in Dooley+ 2017 occupation fraction')
+            raise ValueError('no support for reionization redshift '+str(reionization_redshift)+'in Dooley+ 2017 occupation fraction')
 
     @classmethod
     def central_value(cls, mass):

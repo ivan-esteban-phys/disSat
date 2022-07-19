@@ -1,6 +1,6 @@
 import numpy as np
 import numpy.random as random
-from vutils import mvir2sigLOS
+from .vutils import mvir2sigLOS
 from . import hosts, baryons, dark_matter
 from .relations import Relation
 
@@ -21,21 +21,59 @@ class SatellitePopulation:
         self.properties['mass_stars'] = self._sample_stellar_masses()
         self.properties['rhalf2D'] = self._sample_galaxy_sizes()
         
-        if self.profile != 'mix':
-            self.properties['profile'] = np.repeat(self.profile, self.host.number_of_subhalos)
+        if self.density_profile != 'mix':
+            self.properties['density_profile'] = np.repeat(self.density_profile, self.host.number_of_subhalos)
         else:
-            self.properties['profile'] = np.repeat('coreNFW', self.host.number_of_subhalos)
-            self.properties['profile'][self.properties['mass'] <  self.mswitch_profile] = 'nfw'
+            self.properties['density_profile'] = np.repeat('coreNFW', self.host.number_of_subhalos)
+            self.properties['density_profile'][self.properties['mass'] <  self.mswitch_profile] = 'nfw'
 
-        self.properties['sigLOS'] = self._sample_velocity_dispersions()
+        self.properties['sigLOS'] = self.sample_velocity_dispersions()
 
+    def get_input_parameters(self):
+        parameters = {}
+        for key,val in self.__dict__.items():
+            if   key=='properties': continue
+            elif key=='dark_matter': parameters[key] = val
+            elif key=='host': parameters[key] = val
+            elif callable(val):
+                parameters[key] = val
+            else:
+                parameters[key] = val
+        return parameters
+        
+    def print_input_parameters(self):
+        for key,val in self.__dict__.items():
+            if   key=='properties' or key=='parameters': continue
+            elif key=='dark_matter': print(key,':',self.dark_matter.name,'(class Host)')
+            elif key=='host': print(key,':',self.host.name,'(class DarkMatterModel)')
+            elif callable(val):
+                print(key,':',val.name,'(class',val.__class__.__base__.__name__+')')
+            else:
+                print(key,':',val,'(value)')
+
+                
     def get_relations(self):
-        relations = {}
+
+        # check if host or dark matter model has changed
+        if not self.parameters['dark_matter'] == self.dark_matter:
+            for name, attribute in self.dark_matter.__dict__.items():
+                if isinstance(attribute, Relation):
+                    self.__dict__[name] = attribute
+            self.parameters['dark_matter'] = self.dark_matter
+
+        if not self.parameters['host'] == self.host:
+            for name, attribute in self.host.__dict__.items():
+                if isinstance(attribute, Relation):
+                    self.__dict__[name] = attribute
+            self.parameters['host'] == self.host
+        
+        relations = {}        
         for name,attribute in self.__dict__.items():
             if isinstance(attribute, Relation):
                 relations[name] = attribute
         return relations
-        
+
+    
     def print_relations(self):
         relations = self.get_relations()
         for key,rel in relations.items():
@@ -90,7 +128,7 @@ class SatellitePopulation:
         rhalf[mstar>0] = self.rhalf_2D(mstar[mstar>0])
         return rhalf
     
-    def _sample_velocity_dispersions(self):
+    def sample_velocity_dispersions(self):
 
         c_model = self.concentration.name
         c_model_short = c_model[0].lower()+c_model[-2:]
@@ -100,9 +138,9 @@ class SatellitePopulation:
         mstar = self.properties['mass_stars']
         is_galaxy = mstar>0
         
-        if self.profile != 'mix':
+        if self.density_profile != 'mix':
             sigLOS = mvir2sigLOS(self.properties['mass'],
-                                 self.profile,
+                                 self.density_profile,
                                  mleft=self.mleft,
                                  zin=self.z_infall,
                                  mstar=self.properties['mass_stars'],
@@ -112,7 +150,7 @@ class SatellitePopulation:
                                  sigmaSI=self.dark_matter.sigSI if isinstance(self.dark_matter, dark_matter.models.SIDM) else None)
         else:
             sigLOS = np.zeros(self.host.number_of_subhalos)
-            icore = np.where(is_galaxy * (self.properties['profile']=='coreNFW'))[0]
+            icore = np.where(is_galaxy * (self.properties['density_profile']=='coreNFW'))[0]
             sigLOS[icore] = mvir2sigLOS(self.properties['mass'][icore],
                                         'coreNFW',
                                         mleft=self.mleft,
@@ -121,7 +159,7 @@ class SatellitePopulation:
                                         Re0=self.properties['rhalf2D'][icore],
                                         c200=self.properties['c200'][icore],
                                         cNFW_method=c_model_short)
-            icusp = np.where(is_galaxy * (self.properties['profile'] == 'nfw'))[0]
+            icusp = np.where(is_galaxy * (self.properties['density_profile'] == 'nfw'))[0]
             sigLOS[icusp] = mvir2sigLOS(self.properties['mass'][icusp],
                                         'nfw',
                                         mleft=self.mleft,
@@ -132,36 +170,13 @@ class SatellitePopulation:
                                         cNFW_method=c_model_short)
 
         return sigLOS
-        
 
-        
-class MilkyWaySatellites(SatellitePopulation):
+    
+    def _finish_setup(self):
 
-    name = 'MilkyWaySatellites'
-
-    def __init__(self, min_mass=1e7, profile='mix', mleft=1., cosmology=dark_matter.models.CDM()):
-
-        self.z_infall = 1.
-        self.min_mass = min_mass
-        self.massdef = '200c'
-        self.profile = profile
-        self.mswitch_profile = 5e8 # msun
-        self.mleft = mleft
-
-        self.dark_matter = cosmology
-        
-        self.host = hosts.MilkyWay(cosmology=cosmology)
-        self.host.set_number_of_subhalos(min_mass)
-        
         self.properties = {}
-
-        # choose relations
-        self.concentration = dark_matter.concentrations.Diemer19(scatter=True)
-        self.smhm = baryons.smhm.Moster13(scatter=True)
-        self.occupation_fraction = baryons.occupation_fraction.Dooley17(zreion=9.3)
-        self.rhalf_2D = baryons.galaxy_size.Read17(scatter=True)
-
-        for name, attribute in cosmology.__dict__.items():
+    
+        for name, attribute in self.dark_matter.__dict__.items():
             if isinstance(attribute, Relation):
                 self.__dict__[name] = attribute
 
@@ -169,3 +184,35 @@ class MilkyWaySatellites(SatellitePopulation):
             if isinstance(attribute, Relation):
                 self.__dict__[name] = attribute
                 
+        self.parameters = self.get_input_parameters()
+        
+        
+class MilkyWaySatellites(SatellitePopulation):
+
+    name = 'MilkyWaySatellites'
+
+    def __init__(self, min_mass=1e7, density_profile='mix', mleft=1.,
+                 cosmology=dark_matter.models.CDM()):
+
+        # set parameters
+        self.z_infall = 1.
+        self.min_mass = min_mass
+        self.massdef = '200c'
+        self.density_profile = density_profile
+        self.mswitch_profile = 5e8 # msun
+        self.mleft = mleft
+
+        # set dark matter model and host
+        self.dark_matter = cosmology        
+        self.host = hosts.MilkyWay(cosmology=cosmology)
+        self.host.set_number_of_subhalos(min_mass)
+        
+        # choose relations
+        self.concentration = dark_matter.concentrations.Diemer19(scatter=True)
+        self.smhm = baryons.smhm.Moster13(scatter=True)
+        self.occupation_fraction = baryons.occupation_fraction.Dooley17(reionization_redshift=9.3)
+        self.rhalf_2D = baryons.galaxy_size.Read17(scatter=True)
+
+        # finish setup
+        self._finish_setup()
+        

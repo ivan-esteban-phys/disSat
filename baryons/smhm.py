@@ -12,6 +12,8 @@ cosmo = colossus.cosmology.cosmology.setCosmology('planck18')
 
 
 class SMHM(Relation):
+
+    name = 'SMHM'
     
     def __init__(self, scatter=True):
         self.parameters = {}

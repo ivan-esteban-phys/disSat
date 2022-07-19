@@ -8,7 +8,7 @@ from .observations.vcorrect import *
 from .core import SatellitePopulation
 
 
-def plot_observed_velocity_function(label=False, axes=None):
+def plot_observed_velocity_function(label=True, axes=None):
     """
     Plots the observed velocity function (no completeness corrections).
     """
@@ -19,7 +19,7 @@ def plot_observed_velocity_function(label=False, axes=None):
     axes.plot(obssigmas,obsvfxn,color='0.5',label='observed' if label==True else '') # 'k' if plotband else 'C5' # obs
 
     
-def plot_corrected_velocity_function(label=False, uncertainty='fiducial', color='k', axes=None):
+def plot_corrected_velocity_function(label=True, uncertainty='fiducial', color='k', axes=None, verbose=False):
     """
     Completeness corrects the MW satellite velocity function for dwarfs
     discovered through SDSS, and plots both the raw observed and
@@ -34,6 +34,9 @@ def plot_corrected_velocity_function(label=False, uncertainty='fiducial', color=
 
     color = 'k' used for fiducial uncertainties and 'C5' for other uncertainties
         in Kim & Peter 2022.
+
+    verbose = True to print out the completeness corrections for each individual dwarf
+        for perfect, DES, and LSST surveys.
     """
 
     if axes==None: axes = plt.gca()
@@ -46,7 +49,7 @@ def plot_corrected_velocity_function(label=False, uncertainty='fiducial', color=
     else: the_label = ''
 
     profiles = ['nfw','h14e,gk17']
-    sigmas, rdist_names,nboot = vcorrect(profiles,bootstrap=True,obs_uncertainty=uncertainty)
+    sigmas, rdist_names,nboot = vcorrect(profiles, bootstrap=True, obs_uncertainty=uncertainty, verbose=verbose)
     obssigmas = np.array([ dwarf['sigma'] for dwarf_name,dwarf in dwarfs.items() if dwarf['sigma'] != None ])
     obssigmas.sort()
     vfxn   = np.array([ np.array([median    ([ sum(sigmas[ip][ib]>=sigma) for ib in range(nboot)]   ) for ip in range(len(profiles)) ]) for sigma in obssigmas ])
@@ -62,21 +65,19 @@ def plot_corrected_velocity_function(label=False, uncertainty='fiducial', color=
 
 def plot_theoretical_velocity_fuction(satpops, median_only=False, alpha=1, label='', color='C0', linestyle='-', axes=None):
     """
-    Must give either an array of SatellitePopulation objects or an array of vfxns.
+    For 'satpop', can supply a single SatellitePopulation, an array of SatellitePopulation objects, or an array of vfxns.
     """
 
     if axes==None: axes = plt.gca()
     
     plotsigs = np.logspace(np.log10(2),np.log10(30))
 
-    # for a single satellite population
-    #vfxn = [ sum(satellites.properties['sigLOS']>s) for s in plotsigs ]
-    #plt.plot(plotsigs,vfxn)
-    
-    # for an array of satellite populations
-    if isinstance(satpops[0], SatellitePopulation):
+    if isinstance(satpops, SatellitePopulation):  # for single satellite population
+        vfxn = [ sum(satpops.properties['sigLOS']>s) for s in plotsigs ]
+        return plt.plot(plotsigs,vfxn,label=label,color=color,linestyle=linestyle,alpha=alpha)
+    if isinstance(satpops[0], SatellitePopulation): # for an array of satellite populations
         vfxns = np.array([ satpop.properties['sigLOS'] for satpop in satpops ],dtype=object)
-    else:
+    else:  # just array of velocity functions
         vfxns = satpops[:]
         
     p2sm = np.array([ np.percentile([sum(sigs>s) for sigs in vfxns], 2.3) for s in plotsigs])
@@ -110,3 +111,6 @@ def finalize(legend=False,legend2=None, axes=None, xlabel=True):
     axes.set_ylabel(r'N($>\sigma^*_{\rm los}$)')
     if legend: axes.legend(loc='best',fontsize=12,frameon=False)
     if legend2 != None: axes.add_artist(legend2)
+
+    plt.tight_layout()
+    plt.gca().tick_params(direction='in',which='both') # which = both major and minor

@@ -3,6 +3,8 @@ from . import relations, dark_matter
 
 class Host:
 
+    name = 'Host'
+    
     def __init__(self, cosmology=dark_matter.models.CDM()):
         self.dark_matter = cosmology
         self.subhalo_mass_function = dark_matter.subhaloMF.Moster13(scatter=True)
@@ -17,6 +19,8 @@ class Host:
 
     
 class MilkyWay(Host):
+
+    name = 'MilkyWay'
     
     @staticmethod
     def mass():

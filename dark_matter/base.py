@@ -5,6 +5,8 @@ from ..relations import Relation
 
 class DarkMatterModel():
 
+    name = 'DarkMatterModel'
+
     class SubhaloMassFunction(Relation):
 
         name = 'subhalo_mass_function'

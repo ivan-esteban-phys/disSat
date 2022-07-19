@@ -5,6 +5,8 @@ from ..relations import Relation
 
 class GalaxySize(Relation):
 
+    name = 'GalaxySize'
+    
     def __init__(self, scatter=True):
         self.parameters = {}
         self.sample_scatter = scatter

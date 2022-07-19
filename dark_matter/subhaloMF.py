@@ -3,6 +3,8 @@ from ..relations import Relation
 
 
 class SubhaloMassFunction(Relation):
+
+    name = 'SubhaloMassFunction'
     
     def __init__(self, baryon_reduction=0.8, scatter=True):
         self.parameters = {'alpha': self.alpha(),
