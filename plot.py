@@ -5,7 +5,7 @@ mpl.rcParams.update({'font.family': 'serif'})
 mpl.rcParams.update({'text.usetex': True})
 import matplotlib.pyplot as plt
 from .observations.vcorrect import *
-from .core import SatellitePopulation
+from .satpops import SatellitePopulation
 
 
 def plot_observed_velocity_function(label=True, axes=None):
