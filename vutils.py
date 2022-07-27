@@ -5,15 +5,11 @@ from sys import *
 from numpy import *
 from numpy.random import normal
 import matplotlib as mpl
-#mpl.rcParams['text.usetex'] = True
-#mpl.rcParams['font.family'] = 'serif'
-#mpl.rcParams['font.size'] = 15
 import matplotlib.pyplot as plt
 from scipy.integrate import quad
 from scipy.optimize import minimize_scalar, root, brentq
 
-#from vcorrect import *
-from genutils import *  # NFW definitions imported from here
+from .genutils import *  # NFW definitions imported from here
 
 
 # includes tidal stripping using Penarrubia+ 2010's method. does not include stellar mass (mstar used to calculate Re if needed).
