@@ -6,13 +6,8 @@ from scipy.interpolate import interp1d
 from scipy.optimize import brentq
 
 import os
-hostname = os.uname()[1]
-if hostname == 'CLWS00081':
-    DIR = '/home/stacykim/research/pyutils/'
-elif 'astro' in hostname or 'cluster' in hostname:
-    DIR = '/user/HS103/sk0048/research/pyutils/'
-else:
-    DIR = '/Users/hgzxbprn/Documents/research/pyutils/'
+
+from . import DISDIR
 
 from colossus.cosmology import cosmology
 from colossus.halo.mass_defs import changeMassDefinition
@@ -196,10 +191,6 @@ def dutton14(m,z=0,virial=False):
 # ==============================================================================
 # ABUNDANCE MATCHING
 
-#mhM13,msM13 = loadtxt(DIR+'moster.dat',unpack=True)
-#mhaloM13 = interp1d(log(msM13),log(mhM13),kind='linear',fill_value='extrapolate', bounds_error=False)
-#mstarM13 = interp1d(log(mhM13),log(msM13),kind='linear',fill_value='extrapolate', bounds_error=False)
-
 # Moster+ 2013's redshift-dependent SMHM relation (all in MSUN units)
 M10_M13 = 11.590  # +- 0.236
 M11_M13 =  1.195  # +- 0.353
@@ -222,7 +213,7 @@ def moster13(mhalo,z=0.):
 
 
 # Behroozi+ 2013 z=0 relation
-mhB13,msB13 = loadtxt(DIR+'behroozi.dat' ,unpack=True)
+mhB13,msB13 = loadtxt(DISDIR+'/data/smhm/behroozi.dat' ,unpack=True)
 mhaloB13 = interp1d(log(msB13),log(mhB13),kind='linear',fill_value='extrapolate',bounds_error=False)
 mstarB13 = interp1d(log(mhB13),log(msB13),kind='linear',fill_value='extrapolate',bounds_error=False)
 
@@ -247,22 +238,22 @@ mratio = a200/a350  # M200/M350 as a function of c200, i.e. correction factor!
 m200   = (c200/A200_DUFFY)**(1/B200_DUFFY)*MPIVOT  # invert D08 relation
 m350   =  m200/mratio
 
-mh350B14,msB14 = loadtxt(DIR+'brook.dat' ,unpack=True)
+mh350B14,msB14 = loadtxt(DISDIR+'/data/smhm/brook.dat' ,unpack=True)
 mh200B14 = interp(mh350B14,m350[::-1],m200[::-1])  # mhalo = peak M350, convert to M200 assuming NFW
 mhaloB14 = interp1d(log(msB14),log(mh200B14),kind='linear',fill_value='extrapolate',bounds_error=False)
 mstarB14 = interp1d(log(mh200B14),log(msB14),kind='linear',fill_value='extrapolate',bounds_error=False)
 
 
 # Dooley+ 2017 tuned-bent model
-mhD17,msD17 = loadtxt(DIR+'dooley.dat' ,unpack=True)
+mhD17,msD17 = loadtxt(DISDIR+'/data/smhm/dooley.dat' ,unpack=True)
 mhaloD17 = interp1d(log(msD17),log(mhD17),kind='linear',fill_value='extrapolate',bounds_error=False)
 mstarD17 = interp1d(log(mhD17),log(msD17),kind='linear',fill_value='extrapolate',bounds_error=False)
 
 
 # Munshi+ 2021 model
-log10mhM21,log10msM21 = loadtxt(DIR+'munshi.dat' ,unpack=True)
-mhaloM21 = interp1d(log(10**log10msM21),log(10**log10mhM21),kind='linear',fill_value='extrapolate',bounds_error=False)
-mstarM21 = interp1d(log(10**log10mhM21),log(10**log10msM21),kind='linear',fill_value='extrapolate',bounds_error=False)
+#log10mhM21,log10msM21 = loadtxt(DIR+'munshi.dat' ,unpack=True)
+#mhaloM21 = interp1d(log(10**log10msM21),log(10**log10mhM21),kind='linear',fill_value='extrapolate',bounds_error=False)
+#mstarM21 = interp1d(log(10**log10mhM21),log(10**log10msM21),kind='linear',fill_value='extrapolate',bounds_error=False)
 
 
 # ==============================================================================
