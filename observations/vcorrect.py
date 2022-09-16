@@ -154,7 +154,6 @@ def dmax(mobs,mlimit,algorithm='walsh',router=300.):
 C      = 9.0 # duffy08(mMW) # 12.
 RVIR   = 300. # kpc
 rs     = RVIR/C
-print('--> NOTE: for completeness corrections, hard-coding MW NFW parameters to C =',C,' RS',rs,'kpc  RVIR',RVIR,'kpc')
 
 AREA_DR5     =  8000. # area of SDSS DR5
 AREA_DR8     = 12000. # area of SDSS DR8 (actually 14,500 but need to cut out low Galactic latitudes)
@@ -169,6 +168,8 @@ AREA_SKY     = 41253. # total area of the sky (sq. deg)
 
 def correct(profiles, verbose=True):
 
+    print('--> NOTE: for completeness corrections, hard-coding MW NFW parameters to C =',C,' RS',rs,'kpc  RVIR',RVIR,'kpc')
+    
     menc_fxns   = []
     rdist_names = []
     interp_fxns = []
