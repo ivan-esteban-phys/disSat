@@ -161,9 +161,9 @@ def radial_distribution(r, model, c=9.0, rvir=300., alpha=0.24):
 
     Notes on Inputs:
 
-    r = the radii at whicih to compute the distribution
+    r = the radii at which to compute the distribution
     
-    model = the profile to assume.  Accepted values include
+    model = the profile to assume.  Accepted values include:
 
         'nfw' = Navarro-Frenk-White profile
         'sis' = singular isothermal sphere

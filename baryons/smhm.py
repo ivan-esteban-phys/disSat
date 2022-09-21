@@ -31,7 +31,7 @@ class SMHM(Relation):
     def __call__(self, mass, z=0.):
         median = self.central_value(mass, z=z)
         if self.sample_scatter:
-            return median * 10**random.normal(loc=0,scale=self.scatter(),size=len(mass))
+            return median * 10**random.normal(loc=0,scale=self.scatter(),size=1 if np.array(mass).size==1 else len(mass))
         else:
             return median
 
@@ -47,6 +47,9 @@ class Moster13(SMHM):
 
     @classmethod
     def central_value(cls, mass, z=0.):
+
+        mass = np.array(mass)
+        
         M10_M13 = 11.590  # +- 0.236
         M11_M13 =  1.195  # +- 0.353
         N10_M13 =  0.0351 # +- 0.0058
@@ -136,3 +139,48 @@ class Behroozi13(SMHM):
         warnings.warn('scatter in Behroozi+ 2013 SMHM relation not quantified, using Moster+ 2013 scatter!')
         return 0.15
 
+
+    
+############################################################
+# Wrapper for all SMHM relations
+
+def SMHM(mhalo, model='m13', z=0., scatter=False):
+
+    """
+    Stellar-mass--halo-mass relations.  Given a halo mass, returns
+    the stellar mass of the halo based on the given relation.
+    Assumes all masses are in solar masses.
+
+    Notes on Inputs:
+
+    mhalo = halo mass(es) to compute stellar masses for, in solar masses
+    
+    model = the SMHM relation to use.  Accepted values include:
+
+        'm13' = Moster+ 2013 relation
+        'd17' = Dooley+ 2017 relation
+        'b14' = Brook+ 2014 relation
+        'b13' = Behroozi+ 2013 relation
+
+        By default, assumes the 'm13' relation.
+
+    z = the redshift at which to compute the SMHM relation.  By default,
+        assumes z=0.  Note that not all SMHM relations have support for
+        z > 0.  For these relations, a warning will print, and the z=0
+        relation will be used.
+
+    scatter = whether or not to sample the scatter in the SMHM relation.
+        If False, provides the stellar mass predicted by the median
+        relation.  Note that the scatter has not been measured for some
+        SMHM relations, in which case a lognormal scatter of 0.15 dex is
+        adopted (based on Moster+ 2013).        
+    """
+    
+    if   model == 'm13': relation = Moster13(scatter=scatter)
+    elif model == 'd17': relation = Dooley17(scatter=scatter)
+    elif model == 'b14': relation = Brook14(scatter=scatter)
+    elif model == 'b13': relation = Behroozi13(scatter=scatter)
+    else:
+        raise ValueError("No support for SMHM relation "+model+'!')
+
+    return relation(mhalo, z=z)
