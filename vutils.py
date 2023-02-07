@@ -38,8 +38,8 @@ def menc(renc,m200,profile,mleft=1,mleft100=None,zin=0.,smhm='m13',mstar=None,re
 
     rs,r200 = nfw_r(m200,c200,z=zin,cNFW_method=cNFW_method)  # rs doesn't change with halo def
 
-    m100_div_h, r100_div_h, c100 = changeMassDefinition(m200/h0, c200, zin, '200c', '100c')
-    m100,r100 = m100_div_h * h0, r100_div_h * h0
+    m100_times_h, r100_times_h, c100 = changeMassDefinition(m200*h0, c200, zin, '200c', '100c')
+    m100,r100 = m100_times_h / h0, r100_times_h / h0
 
     # switch from mleft200 to mleft100
     while (not hasattr(mleft100,'__iter__')) and mleft100 == None:
