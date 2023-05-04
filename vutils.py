@@ -54,7 +54,8 @@ def menc(renc,m200,profile,mleft=1,mleft100=None,zin=0.,smhm='m13',mstar=None,re
             break
 
         # else solve for corresponding mleft100
-        f = lambda ml100,mm,rr,cc: menc(rr,mm,profile,mleft100=ml100,zin=zin,sigmaSI=sigmaSI,fudge=fudge,stretch=stretch,mcore_thres=mcore_thres,cNFW_method=cNFW_method,c200=cc,wdm=wdm,mWDM=mWDM)/mm - mleft
+        mleft_profile = 'nfw' if (profile=='coreNFW' or profile=='sidm') else profile
+        f = lambda ml100,mm,rr,cc: menc(rr,mm,mleft_profile,mleft100=ml100,zin=zin,sigmaSI=sigmaSI,fudge=fudge,stretch=stretch,mcore_thres=mcore_thres,cNFW_method=cNFW_method,c200=cc,wdm=wdm,mWDM=mWDM)/mm - mleft
         if (hasattr(mleft,'__iter__') and len(mleft) > 1) or (hasattr(m200,'__iter__') and len(m200) > 1):  # solve for multiple subs at once
             x0 = mleft if (hasattr(mleft,'__iter__') and len(mleft) > 1) else mleft*ones(len(m200))
             mleft100 = array([ root(f,x0=xx0,args=(mm200,rr200,cc200)).x[0] for rr200,mm200,cc200,xx0 in zip(r200,m200,c200,x0) ])
