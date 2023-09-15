@@ -42,7 +42,7 @@ G           = 6.67e-8         # in cgs
 # =============================================================================================
 # GENERAL REDSHIFT-DEPENDENT QUANTITIES
 
-def rho_bar(z,method='d15'):  # in MSUN/KPC^3
+def rho_bar(z,method='d15'):  # mean density in MSUN/KPC^3
     if   method == 'd08':      return cosmoWMAP5.rho_m(z) * (cosmoWMAP5.Hz(0)/100.)**2  # Duffy+ 2008
     elif method == 'd14':      return cosmoP13.rho_m(z)   * (cosmoP13.Hz(0)/100.)**2   # Dutton+ 2014
     elif method == 'd15-wmap': return cosmoWMAP5.rho_m(z) * (cosmoWMAP5.Hz(0)/100.)**2  # cosmology in Duffy+ 2008 but DJ19 c-M relation
@@ -79,12 +79,22 @@ def omega_m(z,method='d15'):
 # MASS PROFILE FUNCTIONS
 # for all the routines that follow, masses are in units of MSUN
 
-def nfw_r(mass,c=None,delta=200.,z=0,cNFW_method='d15'):
-    if (not hasattr(c,'__iter__')) and c==None:  c = cNFW(mass,z=z,massdef=str(int(delta))+'c',method=cNFW_method)
-    rvir3 = mass*MSUN / (4*pi/3*delta*rhoc(z,method=cNFW_method))
-    rvir  = rvir3**(1/3.)
+
+def nfw_r(mass,c=None,massdef='200c',z=0,cNFW_method='d15'):
+
+    if massdef=='vir':
+        raise NotImplementedError('Computing NFW radii with virial halo mass definition not yet supported.')
+    else:
+        delta = float(massdef[:-1])
+        rho = (rhoc(z,method=cNFW_method) * KPC**3/MSUN) if massdef[-1]=='c' else rho_bar(z,method=cNFW_method)
+
+    if (not hasattr(c,'__iter__')) and c==None:
+        c = cNFW(mass,z=z,massdef=massdef,method=cNFW_method)
+        
+    rvir = ( mass / (4*pi/3*delta*rho) )**(1./3)
     rs    = rvir/c
-    return array([rs, rvir])/KPC
+    return array([rs, rvir])
+
 
 def nfw_vmax(m,z=0,cNFW_method='d15',wdm=False,mWDM=5.):
     c       = cNFW(m,z=z,method=cNFW_method,wdm=wdm,mWDM=mWDM)  # duffy08(m) changed 11/22/19
