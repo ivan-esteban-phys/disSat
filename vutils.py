@@ -132,7 +132,7 @@ def menc(renc, m200, profile, massdef='200c', c200=None, cNFW_method='d15',
     elif profile=='coreNFW':
 
         ETA,KAPPA = 3.,0.04
-        fCORENFW = lambda x: (exp(x)-exp(-x)) / (exp(x)+exp(-x))  # x = r/rc
+        fCORENFW = lambda x: np.tanh(x)  # x = r/rc
 
         if  tSF==None: tSF = tin
         tSF *= GYR
