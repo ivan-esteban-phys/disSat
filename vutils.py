@@ -71,39 +71,46 @@ def menc(renc, m200, profile, massdef='200c', c200=None, cNFW_method='d15',
     
     h0 = h(0,method=cNFW_method)
 
-    # assume everything given in M200c units, and switch to M100c, which is system P10 worked in
+    
+    # make sure we have all M200c quantities needed
     if (not hasattr(c200,'__iter__')) and c200==None:
         c200 = cNFW(m200,z=zin,virial=False,method=cNFW_method,wdm=wdm,mWDM=mWDM)
 
     rs,r200 = nfw_r(m200,c200,z=zin,cNFW_method=cNFW_method)  # rs doesn't change with halo def
 
-    m100_times_h, r100_times_h, c100 = changeMassDefinition(m200*h0, c200, zin, '200c', '100c')
-    m100,r100 = m100_times_h / h0, r100_times_h / h0
+    # skip conversion from M200c to M100c units if no tidal stripping (mleft==1), else switch to M100c, which is system P10 worked in
+    if (hasattr(mleft,'__iter__') and all(mleft)==ones(len(mleft))) or (not hasattr(mleft,'__iter__') and mleft == 1):
+        m100,r100,c100,rs = m200,r200,c200,rs
 
-    # switch from mleft200 to mleft100
-    while (not hasattr(mleft100,'__iter__')) and mleft100 == None:
-
-        # if no tidal stripping, then set mleft100 = 1 or ones(N)
         if hasattr(mleft,'__iter__'):
             if all(mleft==ones(len(mleft))):
                 mleft100 = ones(len(mleft))
-                break
+            else:
+                raise NotImplementedError('No support for all(mleft) != 1!')
         elif mleft==1:
             mleft100 = 1.
-            break
+        
+        mleft100 = 1
+    else:
+        m100_times_h, r100_times_h, c100 = changeMassDefinition(m200*h0, c200, zin, '200c', '100c')
+        m100,r100 = m100_times_h / h0, r100_times_h / h0
 
-        # else solve for corresponding mleft100
-        mleft_profile = 'nfw' if (profile=='coreNFW' or profile=='sidm') else profile
-        f = lambda ml100,mm,rr,cc: menc(rr,mm,mleft_profile,mleft100=ml100,zin=zin,sigmaSI=sigmaSI,fudge=fudge,stretch=stretch,mcore_thres=mcore_thres,cNFW_method=cNFW_method,c200=cc,wdm=wdm,mWDM=mWDM)/mm - mleft
-        if (hasattr(mleft,'__iter__') and len(mleft) > 1) or (hasattr(m200,'__iter__') and len(m200) > 1):
-            x0 = mleft if (hasattr(mleft,'__iter__') and len(mleft) > 1) else mleft*ones(len(m200))
-            mleft100 = array([ scipy.optimize.root(f,x0=xx0,args=(mm200,rr200,cc200)).x[0] for rr200,mm200,cc200,xx0 in zip(r200,m200,c200,x0) ])
-            mleft100[mleft100 > 0.9] = 1.
-        else:
-            mleft100 = scipy.optimize.root(f,x0=mleft,args=(m200,r200,c200)).x[0]
-            #print('mleft100 from root-finding;',mleft100)
-            if mleft100 > 0.9: mleft100 = 1.
+        # switch from mleft200 to mleft100
+        while (not hasattr(mleft100,'__iter__')) and mleft100 == None:
+        
+            # else solve for corresponding mleft100
+            mleft_profile = 'nfw' if (profile=='coreNFW' or profile=='sidm') else profile
+            f = lambda ml100,mm,rr,cc: menc(rr,mm,mleft_profile,mleft100=ml100,zin=zin,sigmaSI=sigmaSI,fudge=fudge,stretch=stretch,mcore_thres=mcore_thres,cNFW_method=cNFW_method,c200=cc,wdm=wdm,mWDM=mWDM)/mm - mleft
+            if (hasattr(mleft,'__iter__') and len(mleft) > 1) or (hasattr(m200,'__iter__') and len(m200) > 1):
+                x0 = mleft if (hasattr(mleft,'__iter__') and len(mleft) > 1) else mleft*ones(len(m200))
+                mleft100 = array([ scipy.optimize.root(f,x0=xx0,args=(mm200,rr200,cc200)).x[0] for rr200,mm200,cc200,xx0 in zip(r200,m200,c200,x0) ])
+                mleft100[mleft100 > 0.9] = 1.
+            else:
+                mleft100 = scipy.optimize.root(f,x0=mleft,args=(m200,r200,c200)).x[0]
+                #print('mleft100 from root-finding;',mleft100)
+                if mleft100 > 0.9: mleft100 = 1.
     
+
     onesub = not hasattr(mleft100,'__iter__')
 
     tin = age(zin,method=cNFW_method)  # convert zin into time since infall, in Gyr
