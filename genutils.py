@@ -9,14 +9,14 @@ import os
 
 from . import DISDIR
 
-from colossus.cosmology import cosmology
+from colossus.cosmology import cosmology as cosmo
 from colossus.halo.mass_defs import changeMassDefinition
 from colossus.halo.concentration import concentration as colossus_cNFW
 
-cosmoWMAP5 = cosmology.setCosmology('WMAP5')
-cosmoP13   = cosmology.setCosmology('planck13')
-cosmoP15   = cosmology.setCosmology('planck15')
-cosmoP18   = cosmology.setCosmology('planck18') # default
+cosmoWMAP5 = cosmo.setCosmology('WMAP5')
+cosmoP13   = cosmo.setCosmology('planck13')
+cosmoP15   = cosmo.setCosmology('planck15')
+cosmoP18   = cosmo.setCosmology('planck18') # default
 
 
 CDM_MF = 'd17'
@@ -108,48 +108,63 @@ def nfw_vmax(m,z=0,cNFW_method='d15',wdm=False,mWDM=5.):
 # =============================================================================================
 # MASS-CONCENTRATION RELATIONS
 
-def cNFW(m,z=0,virial=False,massdef=None,method='d15', wdm=False,mWDM=5., kcut=50,ncut=5.0):
+def cNFW(m, z=0, massdef=None, method='d15', cosmology=cosmoP18,
+         wdm=False,mWDM=5., kcut=50,ncut=5.0):
     """
     Returns the NFW concentration, calculated according to the given mass concentration relation 'method'.
-    Written to use the versions from COLOSSUS by Diemer+ 2017, but can use versions I coded up by uncommenting them.
+    Written to use the versions from COLOSSUS by Diemer+ 2017 (https://bdiemer.bitbucket.io/colossus/halo_concentration.html)
     Supports WDM concentrations as given by Schneider+ 2012's relation, given mWDM in keV.
-    https://bdiemer.bitbucket.io/colossus/halo_concentration.html
+
+    Notes on Inputs:
+
+    m = mass of halo (without h), in MSUN
+
+    z = redshift, defaults to 0
+
+    massdef = halo mass definition, as defined in COLOSSUS. By default, uses '200c'
+        but can also provide 'vir' for virial, or respect to the mean matter density
+        (e.g. '200m').  Full list is at https://bdiemer.bitbucket.io/colossus/halo_mass.html.
+
+    method = mass-concentration relation to use.
+        'd08' = Duffy+ 2008
+        'd14' = Dutton+ 2014
+        'd15' = Diemer & Joyce 2019
+        'l16' = Ludlow+ 2016 (without free-streaming cutoff)
+        'd15+1s' = 1 sigma above Diemer & Joyce 2019
+        'd15-1s' = 1 sigma below Diemer & Joyce 2019
+        'd15-wmap' = Diemer & Joyce 2019 assuming WMAP5 cosmology
+
+    cosmology = the cosmological model to adopt.  Mass-concentration relations
+        built for a specific cosmology, it will use the associated cosmology.
+        Those built for any cosmology will default to Planck 2018, unless
+        specified.  Can provide any COLOSSUS Cosmology object.  For full list of
+        supported cosmologies, see https://bdiemer.bitbucket.io/colossus/cosmology_cosmology.html#standard-cosmologies.
+
+    wdm = boolean, whether or not to add WDM concentration suppression.
+        By default, assumes CDM, so wdm=False.  Uses Schneider+ 2012.
+
+    mWDM = the mass of the WDM particle, in keV.  By default, assumes 5 keV.
+        Must have wdm=True in order to be used.
     """
 
-    if massdef==None:  massdef = 'vir' if virial else '200c'
-    h0 = h(0,method=method)
+    if   method=='d08'  : cosmology, model = cosmoWMAP5, 'duffy08'
+    elif method=='d14'  : cosmology, model = cosmoP13  , 'dutton14' # fit to > 1e11 MSUN, z<5)
+    elif 'd15' in method:            model =             'diemer19'
+    elif method=='l16'  :            model =             'ludlow16'
+    if 'wmap' in method : cosmology        = cosmoWMAP5
+    
+    cosmo.setCurrent(cosmology)
+    h0 = cosmology.Hz(z)/100.
+    c = colossus_cNFW(m/h0, massdef, z, model=model)
 
-    if   method=='d08':
-        #return duffy08 (m,z=z,virial=virial)
-        cosmology.setCurrent(cosmoWMAP5)
-        c = colossus_cNFW(m/h0, massdef, z, model='duffy08')
-    elif method=='d14':
-        #return dutton14(m,z=z,virial=virial)
-        cosmology.setCurrent(cosmoP13)
-        c = colossus_cNFW(m/h0, massdef, z, model='dutton14')
-    elif method=='d15': # Diemer & Joyce 2019
-        cosmology.setCurrent(cosmoP18)
-        #cosmology.setCurrent(cosmoWMAP5)
-        c = colossus_cNFW(m/h0, massdef, z, model='diemer19')
+    # Diemer & Joyce 2019 +- 1sigma
+    if   method=='d15+1s':  c *= 10**0.16
+    elif method=='d15-1s':  c /= 10**0.16
 
-    elif method=='d15+1s': # Diemer & Joyce 2019
-        cosmology.setCurrent(cosmoP18)
-        c = colossus_cNFW(m/h0, massdef, z, model='diemer19') * 10**0.16
-    elif method=='d15-1s': # Diemer & Joyce 2019
-        cosmology.setCurrent(cosmoP18)
-        c = colossus_cNFW(m/h0, massdef, z, model='diemer19') / 10**0.16
-    elif method=='d15-wmap':
-        cosmology.setCurrent(cosmoWMAP5)
-        c = colossus_cNFW(m/h0, massdef, z, model='diemer19')
-
+    if not wdm: return c
     else:
-        print('did not recognize given mass-concentration relation',relation,'!  Aborting...')
-        exit()
-
-    if not wdm:
-        return c
-    else:
-        m1m_div_h, r1m_div_h, c1m = changeMassDefinition(m/h0, c, z, '200c', '1m')  # Schneider+ 2012 uses rho_bar in mass def
+        # Schneider+ 2012 uses rho_bar in mass def, so must do mass conversion
+        m1m_div_h, r1m_div_h, c1m = changeMassDefinition(m/h0, c, z, massdef, '1m')
         m1m = m1m_div_h * h0
         return c * (1 + GAMMA1*mass_hm(mWDM,cNFW_method=method)/m1m)**(-GAMMA2)  # Schneider+ 2012
 
@@ -172,29 +187,6 @@ Bvir_DUFFY = -0.084   # mass scaling
 Cvir_DUFFY = -0.47    # redshift scaling
 
 MPIVOT  = 2e12/(cosmoWMAP5.Hz(0)/100.)   # 2e12/h = mormalized mass, in MSUN
-
-def duffy08(m,z=0,virial=False):
-    # m = mass in MSUN
-    if virial:  return Avir_DUFFY * (m/MPIVOT)**Bvir_DUFFY * (1+z)**Cvir_DUFFY
-    else:       return A200_DUFFY * (m/MPIVOT)**B200_DUFFY * (1+z)**C200_DUFFY
-
-
-# Dutton+ 2014 mass-concentration relation
-# technically only fit down to 1e11 MSUN halos...
-# their relation was fit out to z = 5.
-def dutton14(m,z=0,virial=False):
-    """
-    Assumes masses in units of MSUN.
-    If virial==False, then assumes masses in 200*rhocrit definition.
-    """
-    if virial:
-        a = 0.537 + (1.025-0.537) * exp(-0.718 * z**1.08)
-        b = -0.097 + 0.024*z
-    else: # M200crit
-        a = 0.520 + (0.905-0.520) * exp(-0.617 * z**1.21)
-        b = -0.101 + 0.026*z
-    log10c = a + b*log10(m/(1e12/h))
-    return 10**log10c
 
 
 
