@@ -17,27 +17,136 @@ from . import tidal_stripping
 ####################################################################################################
 # MASS ENCLOSED
     
-def menc_new(renc, m200, profile, c200=None, cNFW_method='d15',
-             mleft=1, mleft100=None, zin=0., tSF=None,
-             mstar=None, smhm='m13', reff='r17', Re0=None, nostripRe=False, 
-             mcore_thres=None, wdm=False,mWDM=5., sigmaSI=None,fudge=1.3,stretch=0):
+def menc_new(renc, m200, c200, r200, profile, Re0, zin, h0, tin,
+             mleft=1., mcore_thres=None, wdm=False, mWDM=5., sigmaSI=None):
 
-    h0 = h(0,method=cNFW_method)
-    tin = age(zin,method=cNFW_method)  # convert zin into time since infall, in Gyr
-
-    # assume everything given in M200c units, and switch to M100c, which is system P10 worked in
-    if (not hasattr(c200,'__iter__')) and c200==None:
-        c200 = cNFW(m200,z=zin,virial=False,method=cNFW_method,wdm=wdm,mWDM=mWDM)
-    rs,r200 = nfw_r(m200,c200,z=zin,cNFW_method=cNFW_method)  # rs doesn't change with halo def
-    m100_times_h, r100_times_h, c100 = changeMassDefinition(m200*h0, c200, zin, '200c', '100c')
-    m100,r100 = m100_times_h / h0, r100_times_h / h0
-
-    mleft100 = tidal_stripping.convert_mleft_to_mleft100(mleft, m200, chalo=c200, massdef='200c', density_profile=profile,
-                                                         cNFW_method=cNFW_method, zin=zin, mcore_thres=mcore_thres,
-                                                         wdm=wdm,mWDM=mWDM, sigmaSI=sigmaSI,fudge=fudge,stretch=stretch)
-
-    onesub = not hasattr(mleft100,'__iter__')
+    rs = r200 / c200
     
+    # skip conversion from M200c to M100c units if no tidal stripping (mleft==1), else switch to M100c, which is system P10 worked in
+    if (hasattr(mleft,'__iter__') and all(mleft)==ones(len(mleft))) or (not hasattr(mleft,'__iter__') and mleft == 1):
+        m100, r100, c100, rs = m200, r200, c200, rs
+        mleft100 = 1
+    else:
+        m100_times_h, r100_times_h, c100 = changeMassDefinition(m200*h0, c200, zin, '200c', '100c')
+        m100,r100 = m100_times_h / h0, r100_times_h / h0
+
+        mleft100 = tidal_stripping.convert_mleft_to_mleft100(mleft, m200, chalo=c200, massdef='200c', density_profile=profile,
+                                                             cNFW_method='d15', zin=zin, mcore_thres=mcore_thres,
+                                                             wdm=wdm,mWDM=mWDM, sigmaSI=sigmaSI,fudge=1.3,stretch=0)
+
+    # now calculate mass enclosed!
+    fNFW = lambda xx: log(1+xx) - xx/(1+xx)
+    fNFWstrip = lambda xx: 1./6 * xx**2 * (xx+3) / (xx+1)**3
+    
+    fCORENFW = lambda x: np.tanh(x)  # x = r/rc
+
+    fCORE = lambda xx: log(xx+1) - 0.5*xx*(2+3*xx)/(1+xx)**2
+    fCOREstrip = lambda xx: xx**3*(xx+4) / 12./(xx+1)**4
+
+    fBURK = lambda xx: (1./4.)*( log( 1+xx**2) + 2*log( 1+xx) - 2*arctan(xx))
+    fNFWstrip = lambda xx: 1./6 * xx**2 * (xx+3) / (xx+1)**3
+    fNFWdens = lambda xx: (xx*(1+xx)**2)**(-1)
+    fBURKdens = lambda xx: ( (1+xx) * ( 1+xx**2))**(-1.)
+    fNFWstripdens = lambda xx: 1./(xx*(1+xx)**4)
+        
+    if profile=='nfw' or profile=='NFW':
+        if (mleft100==1) or all(mleft100==ones(len(mleft100))):  return m100*fNFW(renc/rs)/fNFW(c100)
+
+        R_MU,R_ETA, V_MU,V_ETA = -0.3,0.4 , 0.4,0.3
+        rmax     = 2.16258 * rs * KPC  # in cm
+        vmax     = sqrt(G * m100*MSUN*fNFW(rmax/(rs*KPC))/fNFW(c100) / rmax) # in cm/s
+        rmax_new = 2**R_MU * mleft100**R_ETA / (1+mleft100)**R_MU * rmax # in cm
+        vmax_new = 2**V_MU * mleft100**V_ETA / (1+mleft100)**V_MU * vmax # in cm/s
+        rs_new   = rmax_new/(sqrt(7.)-2.)  # in cm
+
+        return rmax_new * vmax_new**2 / G * fNFWstrip(renc*KPC/rs_new)/fNFWstrip(rmax_new/rs_new) / MSUN # in MSUN        
+
+    elif profile=='coreNFW':
+        ETA,KAPPA = 3.,0.04
+        tSF = tin * GYR
+
+        tDYN = 2*pi*sqrt((rs*KPC)**3/G/(m200*fNFW(rs/rs)/fNFW(c200)*MSUN))
+
+        q = KAPPA * tSF / tDYN
+        n = fCORENFW(q)
+
+        Rc = ETA * Re0  # coreNFW core radius, in kpc
+
+        if not hasattr(m200,'__iter__'):
+            suppression = 1 if (mcore_thres != None and m200 < mcore_thres) else fCORENFW(renc/Rc)**n
+        elif mcore_thres == None:
+            suppression = fCORENFW(renc/Rc)**n
+        else:
+            suppression = array([1. if mm < mcore_thres else fCORENFW(rrenc/rrc)**nn for mm,rrenc,rrc,nn in zip(m200,renc,Rc,n)])
+
+        return menc_new(renc, m200, c200, r200, 'nfw', Re0, zin, h0, tin, mleft=mleft, wdm=wdm, mWDM=mWDM, sigmaSI=sigmaSI) * suppression
+
+
+    elif profile=='cored':
+        if (not onesub and all(mleft100==ones(len(mleft100)))) or (onesub and mleft100==1):  return m100*fCORE(renc/rs)/fCORE(c100)
+        
+        R_MU,R_ETA, V_MU,V_ETA = -1.3,0.05 , 0.4,0.37
+        rmax     = 4.4247 *rs * KPC  # in cm
+        vmax     = sqrt(G * m100*MSUN*fCORE(rmax/(rs*KPC))/fCORE(c100) / rmax) # in cm/s
+        rmax_new = 2**R_MU * mleft100**R_ETA / (1+mleft100)**R_MU * rmax  # in cm
+        vmax_new = 2**V_MU * mleft100**V_ETA / (1+mleft100)**V_MU * vmax  # in cm/s
+        rs_new   = rmax_new * 2/(sqrt(57)-5)  # in cm
+        
+        return rmax_new * vmax_new**2 / G * fCOREstrip(renc*KPC/rs_new)/fCOREstrip(rmax_new/rs_new) / MSUN # in MSUN
+
+
+    elif profile=='sidm' or profile=='SIDM':
+
+        if sigmaSI==None:
+            print('given profile SIDM but not sigmaSI! Aborting...')
+            exit()
+
+        tin = age(0)  # assume it's had the entire age of universe to form core
+
+        fudgeVmax = 1.5  # Fiducial value is 2.5 from Rocha+2013.  Needed an adjustment going to dwarf scales,
+                         # I think because the concentration change for dwarfs relative to clusters shifts
+                         # the relationship between vrms and vmax.
+        rmax     = 2.16258 * rs * KPC  # in cm
+        vmax     = sqrt(G * m100*MSUN*fNFW(2.16258)/fNFW(c100) / rmax) # in cm/s
+    
+        # r1/rs according to the prescription in Sec. 7 of Rocha+ 2013
+        if (hasattr(c100,'__iter__') and len(c100) > 1):
+            r1_rs = array([ scipy.optimize.brentq( lambda x: fudgeVmax*vm**3/(G*rm**2) *fNFWdens(x) * tin*GYR * sigmaSI -1. , 1e-8, cc) for vm,rm,cc in zip(vmax,rmax,c100) ]) 
+        else:
+            r1_rs = scipy.optimize.brentq( lambda x: fudgeVmax*vmax**3/(G*rmax**2) *fNFWdens(x) * tin*GYR * sigmaSI -1. , 1e-8, c100 )
+        rb = fudge * r1_rs  # rb/rs, currently in original form.
+
+        if (not onesub and all(mleft100==ones(len(mleft100)))) or (onesub and mleft100==1):
+
+            fSIDM_inner = lambda xx: m100*(fNFWdens(r1_rs)/fBURKdens(r1_rs/rb))*rb**3 * fBURK(xx/rb)/fNFW(c100)
+            fSIDM_outer = lambda xx: m100*(fNFW(xx) - fNFW(r1_rs))/fNFW(c100) + fSIDM_inner(r1_rs)
+            fSIDM = lambda xx: (xx > r1_rs)*fSIDM_outer(xx) + (xx <= r1_rs)*fSIDM_inner(xx)
+
+            return fSIDM( renc/rs )
+        
+        else:
+
+            R_MU,R_ETA, V_MU,V_ETA = -0.3,0.4 , 0.4,0.3
+            rmax     = 2.16258 * rs * KPC  # in cm
+            vmax     = sqrt(G * m100*MSUN*fNFW(rmax/(rs*KPC))/fNFW(c100) / rmax) # in cm/s
+            rmax_new = 2**R_MU * mleft100**R_ETA / (1+mleft100)**R_MU * rmax # in cm
+            vmax_new = 2**V_MU * mleft100**V_ETA / (1+mleft100)**V_MU * vmax # in cm/s
+            rs_new   = rmax_new/(sqrt(7.)-2.)  # in cm
+            mmax     = rmax_new * vmax_new**2 / G / MSUN # mass enclosed at rmax_new
+            
+            if stretch==0:  # Case if rb is a fixed physical scale, instead of with respect to rs.
+                rb = rb/(rs_new/rs/KPC)
+                r1_rs = r1_rs/(rs_new/rs/KPC)
+            
+            fSIDM_inner = lambda xx: mmax*(fNFWstripdens(r1_rs)/fBURKdens(r1_rs/rb))*rb**3 * fBURK(xx/rb)/fNFWstrip(rmax_new/rs_new)
+            fSIDM_outer = lambda xx: mmax*(fNFWstrip(xx) - fNFWstrip(r1_rs))/fNFWstrip(rmax_new/rs_new) + fSIDM_inner(r1_rs)
+            fSIDM = lambda xx: (xx > r1_rs)*fSIDM_outer(xx) + (xx <= r1_rs)*fSIDM_inner(xx)
+            
+            return fSIDM( renc / (rs_new/KPC) )
+    else:
+
+        print('menc for density profile',profile,'not implemented... aborting.')
+        exit()    
 
     
 def menc(renc, m200, profile, massdef='200c', c200=None, cNFW_method='d15',
@@ -143,7 +252,9 @@ def menc(renc, m200, profile, massdef='200c', c200=None, cNFW_method='d15',
 
         if  tSF==None: tSF = tin
         tSF *= GYR
+
         tDYN = 2*pi*sqrt((rs*KPC)**3/G/(menc(rs,m200,'nfw',mleft=1,zin=zin,cNFW_method=cNFW_method,c200=c200,wdm=wdm,mWDM=mWDM)*MSUN))
+
         q = KAPPA * tSF / tDYN
         n = fCORENFW(q)
 
@@ -156,7 +267,7 @@ def menc(renc, m200, profile, massdef='200c', c200=None, cNFW_method='d15',
         elif mcore_thres == None:
             suppression = fCORENFW(renc/Rc)**n
         else:
-            suppression = array([1. if mm < mcore_thres else fCORENFW(rrenc/rrc)**nn for mm,rrenc,rrc,nn in zip(m200,renc,Rc,n)])
+            suppression = np.where(m200 < mcore_thres, 1, fCORENFW(renc/Rc)**n)
 
         return menc(renc,m200,'nfw',mleft100=mleft100,zin=zin,cNFW_method=cNFW_method,c200=c200,wdm=wdm,mWDM=mWDM) * suppression
 
@@ -378,3 +489,37 @@ def mvir2sigLOS(mvir,profile,mleft=1.,cK=5.,mstar=None,zin=1.,estimator='wolf201
     
     return sqrt(sigLOS2)
 
+
+def mvir2sigLOS_new(mvir, c200, r200, profile, mstar, Re0, zin, h0, tin,
+                    mleft=1., estimator='wolf2010', mcore_thres=None, wdm=False, mWDM=5., sigmaSI=None):
+
+    ## Compute stripped half-light radius ##
+
+    if (hasattr(mleft,'__iter__') and all(mleft)==ones(len(mleft))) or (not hasattr(mleft,'__iter__') and mleft == 1):    
+        Re = Re0
+    else: # Strip tidal radius following Penarrubia+ 2008 methods
+        cK = 5 # Hard-coded King concentration
+        Rcore  = Re0/Reff_in_Rcore(cK)  # 2D core radius, in kpc
+        
+        base_profile = 'nfw' if (profile=='coreNFW' or profile=='sidm' or profile=='SIDM') else profile
+        
+        mcore0 = menc_new(Rcore, m200=m200, c200=c200, r200=r200, profile=base_profile, Re0=Re0, zin=zin, h0=h0, tin=tin, mleft=1, mcore_thres=mcore_thres, wdm=wdm, mWDM=mWDM, sigmaSI=sigmaSI)  # 3D integral in mass, in MSUN
+        mcore = menc_new(Rcore, m200=m200, c200=c200, r200=r200, profile=base_profile, Re0=Re0, zin=zin, h0=h0, tin=tin, mleft=mleft, mcore_thres=mcore_thres, wdm=wdm, mWDM=mWDM, sigmaSI=sigmaSI)  # 3D integral in mass, in MSUN                
+        mleft_core = mcore / mcore0
+        
+        Re     = Re0 * delta_Reff(mleft_core)
+
+    ## Compute velocity dispersion ##
+    
+    if estimator=='wolf2010':
+        re = Re/0.75  # the 3D half-light radius; conversion factor from Wolf+ 2010
+        mh = menc_new(re, m200=mvir, profile=profile, mleft=mleft, zin=zin, h0=h0, tin=tin, sigmaSI=sigmaSI, Re0=Re0, mcore_thres=mcore_thres, c200=c200, r200=r200, wdm=wdm, mWDM=mWDM)  # mass w/in the 3D half-light radius
+        if hasattr(mstar,'__iter__') or mstar != None:  mh += mstar/2.  # assume half stellar mass w/in Reff. Should adjust amount added w/tidal stripping?
+        sigLOS2 = G/4*(mh*MSUN)/(Re*KPC) / KMS**2
+
+    if estimator == 'errani2018':
+        m_est = menc_new(1.8*Re, m200=mvir, profile=profile, mleft=mleft, zin=zin, h0=h0, tin=tin, sigmaSI=sigmaSI, Re0=Re0, mcore_thres=mcore_thres, c200=c200, r200=r200, wdm=wdm, mWDM=mWDM)  # mass w/in 1.8 * 2D half-light radius
+        if hasattr(mstar,'__iter__') or mstar != None:  m_est += mstar/2.  # assume half stellar mass w/in Reff. Should adjust amount added w/tidal stripping?
+        sigLOS2 = G/3.5*(m_est*MSUN)/(1.8*Re*KPC) / KMS**2
+    
+    return sqrt(sigLOS2)

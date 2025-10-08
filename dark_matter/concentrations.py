@@ -1,5 +1,6 @@
 import warnings
 import numpy.random as random
+import numpy as np
 from ..relations import Relation
 import colossus
 cosmoWMAP5 = colossus.cosmology.cosmology.setCosmology('WMAP5')
@@ -16,12 +17,22 @@ class MassConcentration(Relation):
 
     name = 'MassConcentration'
     
-    def __init__(self, scatter=True):
+    def __init__(self, scatter=True, z=None, M_min=1e6, M_max=1e12):
+        """
+          If z is a number, the redshift is fixed at construction time,
+        the concentration-mass relation is computed once, and the result
+        is interpolated for halo masses between M_min and M_max.
+        This can make sampling orders of magnitude faster.
+        """
         self.parameters = {}
         self.sample_scatter = scatter
-        
-    @classmethod
-    def central_value(cls, mass, z):
+        if z == None:
+            self.fixed_z = False
+        else:
+            self.fixed_z = True
+            self.z = z
+
+    def central_value(self, mass, z=None):
         raise NotImplementedError('This is an abstract class.')
 
     @staticmethod
@@ -45,11 +56,24 @@ class Diemer19(MassConcentration):
 
     name = 'Diemer19'
 
-    @classmethod
-    def central_value(cls, mass, z):
-        colossus.cosmology.cosmology.setCurrent(cosmoP18)
-        h0 = cosmoP18.Hz(0)/100.
-        return colossus.halo.concentration.concentration(mass/h0, '200c', z, model='diemer19')
+    def __init__(self, scatter=True, z=None, M_min=1e6, M_max=1e12):
+        super().__init__(scatter, z, M_min, M_max)
+        if self.fixed_z:
+            colossus.cosmology.cosmology.setCurrent(cosmoP18)
+            h0 = cosmoP18.Hz(0)/100.
+            
+            self.mass_interp_list = np.geomspace(M_min, M_max, 600)
+            self.conc_interp_list = colossus.halo.concentration.concentration(self.mass_interp_list/h0, '200c', self.z, model='diemer19')
+
+    def central_value(self, mass, z=None):
+        if self.fixed_z:
+            c = np.interp(np.log10(mass), np.log10(self.mass_interp_list), self.conc_interp_list)            
+        else:
+            colossus.cosmology.cosmology.setCurrent(cosmoP18)
+            h0 = cosmoP18.Hz(0)/100.
+            c = colossus.halo.concentration.concentration(mass/h0, '200c', z, model='diemer19')
+            
+        return c
     
     @staticmethod
     def scatter():
@@ -61,13 +85,26 @@ class Duffy08(MassConcentration):
 
     name = 'Duffy08'
 
-    @classmethod
-    def central_value(cls, mass, z):
-        colossus.cosmology.cosmology.setCurrent(cosmoWMAP5)
-        h0 = cosmoWMAP5.Hz(0)/100.
-        c = colossus.halo.concentration.concentration(mass/h0, '200c', z, model='duffy08')
-        colossus.cosmology.cosmology.setCurrent(cosmoP18)  # set back to Planck 18
-        return c
+    def __init__(self, scatter=True, z=None, M_min=1e6, M_max=1e12):
+        super().__init__(scatter, z, M_min, M_max)
+        if self.fixed_z:
+            colossus.cosmology.cosmology.setCurrent(cosmoWMAP5)
+            h0 = cosmoWMAP5.Hz(0)/100.
+            
+            self.mass_interp_list = np.geomspace(M_min, M_max, 600)
+            self.conc_interp_list = colossus.halo.concentration.concentration(self.mass_interp_list/h0, '200c', self.z, model='duffy08')
+            colossus.cosmology.cosmology.setCurrent(cosmoP18)  # set back to Planck 18            
+
+    def central_value(self, mass, z=None):
+        if self.fixed_z:
+            c = np.interp(np.log10(mass), np.log10(self.mass_interp_list), self.conc_interp_list)            
+        else:
+            colossus.cosmology.cosmology.setCurrent(cosmoWMAP5)
+            h0 = cosmoWMAP5.Hz(0)/100.
+            c = colossus.halo.concentration.concentration(mass/h0, '200c', z, model='duffy08')
+            colossus.cosmology.cosmology.setCurrent(cosmoP18)  # set back to Planck 18            
+            
+        return c            
 
     @staticmethod
     def scatter():
@@ -79,12 +116,25 @@ class Dutton14(MassConcentration):
 
     name = 'Dutton14'
 
-    @classmethod
-    def central_value(cls, mass, z):
-        colossus.cosmology.cosmology.setCurrent(cosmoP13)
-        h0 = cosmoP13.Hz(0)/100.
-        c = colossus.halo.concentration.concentration(mass/h0, '200c', z, model='dutton14')
-        colossus.cosmology.cosmology.setCurrent(cosmoP18)  # set back to Planck 18
+    def __init__(self, scatter=True, z=None, M_min=1e6, M_max=1e12):
+        super().__init__(scatter, z, M_min, M_max)
+        if self.fixed_z:
+            colossus.cosmology.cosmology.setCurrent(cosmoP13)
+            h0 = cosmoP13.Hz(0)/100.
+            
+            self.mass_interp_list = np.geomspace(M_min, M_max, 600)
+            self.conc_interp_list = colossus.halo.concentration.concentration(self.mass_interp_list/h0, '200c', self.z, model='dutton14')
+            colossus.cosmology.cosmology.setCurrent(cosmoP18)  # set back to Planck 18
+
+    def central_value(self, mass, z=None):
+        if self.fixed_z:
+            c = np.interp(np.log10(mass), np.log10(self.mass_interp_list), self.conc_interp_list)            
+        else:
+            colossus.cosmology.cosmology.setCurrent(cosmoP13)
+            h0 = cosmoP13.Hz(0)/100.
+            c = colossus.halo.concentration.concentration(mass/h0, '200c', z, model='dutton14')
+            colossus.cosmology.cosmology.setCurrent(cosmoP18)  # set back to Planck 18
+            
         return c
 
     @staticmethod
